@@ -16,6 +16,7 @@ interface AuthRepository {
     suspend fun register(username: String, email: String, password: String): Result<FirebaseUser?>
     suspend fun signInWithCredential(credential: AuthCredential): Result<FirebaseUser?>
     suspend fun getUserMetadata(uid: String): Result<UserMetadata?>
+    fun getUserMetadataFlow(uid: String): Flow<UserMetadata?>
     suspend fun getUsersMetadata(uids: List<String>): Result<List<UserMetadata>>
     fun getUsersMetadataFlow(uids: List<String>): Flow<List<UserMetadata>>
     fun logout()
@@ -79,6 +80,20 @@ class FirebaseAuthRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    override fun getUserMetadataFlow(uid: String): Flow<UserMetadata?> = callbackFlow {
+        val subscription = firestore.collection("users")
+            .document(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val metadata = snapshot?.toObject(UserMetadata::class.java)
+                trySend(metadata)
+            }
+        awaitClose { subscription.remove() }
     }
 
     override suspend fun getUsersMetadata(uids: List<String>): Result<List<UserMetadata>> {

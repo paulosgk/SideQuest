@@ -2,17 +2,26 @@ package com.example.sidequest.ui.match
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.sidequest.data.Challenge
+import com.example.sidequest.data.ChallengeRepository
+import com.example.sidequest.data.ChallengeWithAssignment
 import com.example.sidequest.data.Match
 import com.example.sidequest.data.MatchRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class MatchState(
     val activeMatch: Match? = null,
+    val userChallenges: List<ChallengeWithAssignment> = emptyList(),
+    val selectedChallenge: ChallengeWithAssignment? = null,
     val isLoading: Boolean = false,
     val isCreating: Boolean = false,
     val error: String? = null,
@@ -22,6 +31,7 @@ data class MatchState(
 class MatchViewModel(
     private val groupId: String,
     private val matchRepository: MatchRepository,
+    private val challengeRepository: ChallengeRepository,
     private val userId: String
 ) : ViewModel() {
 
@@ -30,6 +40,7 @@ class MatchViewModel(
 
     init {
         listenToActiveMatch()
+        listenToUserChallenges()
     }
 
     private fun listenToActiveMatch() {
@@ -38,6 +49,30 @@ class MatchViewModel(
                 _state.value = _state.value.copy(activeMatch = match)
             }
             .launchIn(viewModelScope)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun listenToUserChallenges() {
+        state.flatMapLatest { matchState ->
+            val matchId = matchState.activeMatch?.id
+            if (matchId != null) {
+                combine(
+                    matchRepository.getAssignedChallengesFlow(matchId, userId),
+                    challengeRepository.getChallengeTemplatesFlow()
+                ) { assignments, templates ->
+                    assignments.mapNotNull { assignment ->
+                        val template = templates.find { it.id == assignment.challengeId }
+                        if (template != null) {
+                            ChallengeWithAssignment(template, assignment)
+                        } else null
+                    }
+                }
+            } else {
+                flowOf(emptyList())
+            }
+        }.onEach { userChallenges ->
+            _state.value = _state.value.copy(userChallenges = userChallenges)
+        }.launchIn(viewModelScope)
     }
 
     fun createMatch(challengeCount: Int) {
@@ -56,6 +91,11 @@ class MatchViewModel(
                 )
             }
         }
+    }
+
+    fun selectChallenge(assignmentId: String) {
+        val challenge = _state.value.userChallenges.find { it.assignment.id == assignmentId }
+        _state.value = _state.value.copy(selectedChallenge = challenge)
     }
 
     fun resetMatchCreationState() {

@@ -1,0 +1,37 @@
+[
+  { "title": "Compliment a Stranger", "description": "Give a genuine compliment to someone you don't know.", "difficulty": "EASY", "category": "SOCIAL", "type": "DEFAULT" },
+  { "title": "Buy Someone a Coffee", "description": "Pay for a drink for a friend or a stranger.", "difficulty": "MEDIUM", "category": "SOCIAL", "type": "DEFAULT" },
+  { "title": "Host a Game Night", "description": "Invite friends over for board games or video games.", "difficulty": "HARD", "category": "SOCIAL", "type": "DEFAULT" },
+  { "title": "Deliver a Speech", "description": "Give a short speech or toast at an event or to a group.", "difficulty": "EXTREME", "category": "SOCIAL", "type": "DEFAULT" },
+  { "title": "Learn a New Greeting", "description": "Learn how to say 'Hello' in 5 different languages.", "difficulty": "EASY", "category": "SOCIAL", "type": "DEFAULT" },
+
+  { "title": "10 Push-ups", "description": "Complete 10 push-ups in one go.", "difficulty": "EASY", "category": "FITNESS", "type": "DEFAULT" },
+  { "title": "Run a Mile", "description": "Complete a continuous one-mile run.", "difficulty": "MEDIUM", "category": "FITNESS", "type": "DEFAULT" },
+  { "title": "50 Burpees", "description": "Complete 50 burpees as fast as you can.", "difficulty": "HARD", "category": "FITNESS", "type": "DEFAULT" },
+  { "title": "Run a Half Marathon", "description": "Complete a 13.1-mile run.", "difficulty": "EXTREME", "category": "FITNESS", "type": "DEFAULT" },
+  { "title": "Plank for 2 Minutes", "description": "Hold a steady plank position for 120 seconds.", "difficulty": "MEDIUM", "category": "FITNESS", "type": "DEFAULT" },
+
+  { "title": "Take a Hike", "description": "Go for a walk on a local nature trail.", "difficulty": "EASY", "category": "ADVENTURE", "type": "DEFAULT" },
+  { "title": "Visit a New City", "description": "Spend the day exploring a city you've never been to.", "difficulty": "MEDIUM", "category": "ADVENTURE", "type": "DEFAULT" },
+  { "title": "Go Camping", "description": "Spend a night sleeping under the stars.", "difficulty": "HARD", "category": "ADVENTURE", "type": "DEFAULT" },
+  { "title": "Bungee Jumping", "description": "Take the leap of faith!", "difficulty": "EXTREME", "category": "ADVENTURE", "type": "DEFAULT" },
+  { "title": "Star Gazing", "description": "Find a dark spot and identify 3 constellations.", "difficulty": "EASY", "category": "ADVENTURE", "type": "DEFAULT" },
+
+  { "title": "Doodle Something", "description": "Sketch a quick drawing of your surroundings.", "difficulty": "EASY", "category": "CREATIVITY", "type": "DEFAULT" },
+  { "title": "Write a Poem", "description": "Write a 4-line rhyming poem about your day.", "difficulty": "MEDIUM", "category": "CREATIVITY", "type": "DEFAULT" },
+  { "title": "Paint a Masterpiece", "description": "Create a full canvas painting using any medium.", "difficulty": "HARD", "category": "CREATIVITY", "type": "DEFAULT" },
+  { "title": "Write a Short Story", "description": "Compose a 5,000-word story from scratch.", "difficulty": "EXTREME", "category": "CREATIVITY", "type": "DEFAULT" },
+  { "title": "Cook a New Dish", "description": "Try a recipe for a cuisine you've never cooked before.", "difficulty": "MEDIUM", "category": "CREATIVITY", "type": "DEFAULT" },
+
+  { "title": "Solve a Sudoku", "description": "Complete one Sudoku puzzle of any difficulty.", "difficulty": "EASY", "category": "PUZZLE", "type": "DEFAULT" },
+  { "title": "Crossword Daily", "description": "Finish the daily crossword in a newspaper or app.", "difficulty": "MEDIUM", "category": "PUZZLE", "type": "DEFAULT" },
+  { "title": "Solve a Rubik's Cube", "description": "Fully solve a 3x3 Rubik's Cube.", "difficulty": "HARD", "category": "PUZZLE", "type": "DEFAULT" },
+  { "title": "Escape Room", "description": "Successfully escape from a physical escape room.", "difficulty": "EXTREME", "category": "PUZZLE", "type": "DEFAULT" },
+  { "title": "Learn a Magic Trick", "description": "Perform a simple card or coin trick for a friend.", "difficulty": "MEDIUM", "category": "PUZZLE", "type": "DEFAULT" },
+
+  { "title": "Drink More Water", "description": "Drink 2 liters of water in one day.", "difficulty": "EASY", "category": "RANDOM", "type": "DEFAULT" },
+  { "title": "No Phone for 1 Hour", "description": "Put your phone in another room for 60 minutes.", "difficulty": "MEDIUM", "category": "RANDOM", "type": "DEFAULT" },
+  { "title": "Wake Up at 5 AM", "description": "Start your day before the sun rises.", "difficulty": "HARD", "category": "RANDOM", "type": "DEFAULT" },
+  { "title": "24-Hour Fast", "description": "Go 24 hours without eating (stay hydrated!).", "difficulty": "EXTREME", "category": "RANDOM", "type": "DEFAULT" },
+  { "title": "Random Act of Kindness", "description": "Do something nice for someone without being asked.", "difficulty": "MEDIUM", "category": "RANDOM", "type": "DEFAULT" }
+]

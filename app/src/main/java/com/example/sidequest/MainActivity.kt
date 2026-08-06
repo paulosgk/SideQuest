@@ -7,9 +7,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +20,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,7 +59,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.sidequest.data.ChallengeWithAssignment
 import com.example.sidequest.data.FirebaseAuthRepository
+import com.example.sidequest.data.FirebaseChallengeRepository
 import com.example.sidequest.data.FirebaseGroupRepository
 import com.example.sidequest.data.FirebaseMatchRepository
 import com.example.sidequest.ui.auth.AuthViewModel
@@ -79,6 +87,13 @@ sealed class Screen(val route: String) {
     object ActiveMatch : Screen("active_match/{groupId}/{matchId}") {
         fun createRoute(groupId: String, matchId: String) = "active_match/$groupId/$matchId"
     }
+    object MyChallenges : Screen("my_challenges/{groupId}/{matchId}") {
+        fun createRoute(groupId: String, matchId: String) = "my_challenges/$groupId/$matchId"
+    }
+    object ChallengeDetails : Screen("challenge_details/{groupId}/{matchId}/{assignmentId}") {
+        fun createRoute(groupId: String, matchId: String, assignmentId: String) = 
+            "challenge_details/$groupId/$matchId/$assignmentId"
+    }
 }
 
 class AuthViewModelFactory : ViewModelProvider.Factory {
@@ -87,7 +102,8 @@ class AuthViewModelFactory : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             return AuthViewModel(
                 FirebaseAuthRepository(),
-                FirebaseGroupRepository()
+                FirebaseGroupRepository(),
+                FirebaseChallengeRepository()
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -118,6 +134,7 @@ class MatchViewModelFactory(
             return MatchViewModel(
                 groupId,
                 FirebaseMatchRepository(),
+                FirebaseChallengeRepository(),
                 userId
             ) as T
         }
@@ -252,7 +269,11 @@ fun SideQuestNavHost(
                 authState = authState,
                 onLogoutClick = { authViewModel.logout() },
                 onCreateGroupClick = { authViewModel.createGroup() },
-                onJoinGroupClick = { inviteCode -> authViewModel.joinGroup(inviteCode) }
+                onJoinGroupClick = { inviteCode -> authViewModel.joinGroup(inviteCode) },
+                onSeedChallengesClick = { 
+                    val jsonString = context.assets.open("challenges.json").bufferedReader().use { it.readText() }
+                    authViewModel.seedDefaultChallenges(jsonString)
+                }
             ) 
         }
         composable(Screen.GroupDetail.route) { backStackEntry ->
@@ -309,7 +330,45 @@ fun SideQuestNavHost(
             ActiveMatchScreen(
                 matchId = matchId,
                 matchState = matchState,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onViewChallengesClick = { 
+                    navController.navigate(Screen.MyChallenges.createRoute(groupId, matchId))
+                }
+            )
+        }
+        composable(Screen.MyChallenges.route) { backStackEntry ->
+            val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
+            val matchId = backStackEntry.arguments?.getString("matchId") ?: ""
+            val matchViewModel: MatchViewModel = viewModel(
+                factory = MatchViewModelFactory(groupId, authState.user?.uid ?: "")
+            )
+            val matchState by matchViewModel.state.collectAsState()
+
+            MyChallengesScreen(
+                matchState = matchState,
+                onBackClick = { navController.popBackStack() },
+                onChallengeClick = { assignmentId ->
+                    navController.navigate(Screen.ChallengeDetails.createRoute(groupId, matchId, assignmentId))
+                }
+            )
+        }
+        composable(Screen.ChallengeDetails.route) { backStackEntry ->
+            val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
+            val assignmentId = backStackEntry.arguments?.getString("assignmentId") ?: ""
+            val matchViewModel: MatchViewModel = viewModel(
+                factory = MatchViewModelFactory(groupId, authState.user?.uid ?: "")
+            )
+            val matchState by matchViewModel.state.collectAsState()
+
+            // Initialize selected challenge in VM
+            LaunchedEffect(assignmentId) {
+                matchViewModel.selectChallenge(assignmentId)
+            }
+
+            ChallengeDetailsScreen(
+                matchState = matchState,
+                onBackClick = { navController.popBackStack() },
+                onSubmitProofClick = { /* TODO */ }
             )
         }
     }
@@ -570,7 +629,8 @@ fun HomePage(
     authState: com.example.sidequest.ui.auth.AuthState,
     onLogoutClick: () -> Unit,
     onCreateGroupClick: () -> Unit,
-    onJoinGroupClick: (String) -> Unit
+    onJoinGroupClick: (String) -> Unit,
+    onSeedChallengesClick: () -> Unit
 ) {
     val metadata = authState.userMetadata
     var showJoinDialog by remember { mutableStateOf(false) }
@@ -642,6 +702,16 @@ fun HomePage(
                 ) {
                     Text("Go to Group")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Temporary Seeding Button (Visible for development)
+            TextButton(
+                onClick = onSeedChallengesClick,
+                enabled = !authState.isSeeding
+            ) {
+                Text(if (authState.isSeeding) "Seeding Challenges..." else "Seed Default Challenges")
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -938,7 +1008,8 @@ fun CreateMatchScreen(
 fun ActiveMatchScreen(
     matchId: String,
     matchState: com.example.sidequest.ui.match.MatchState,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onViewChallengesClick: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -957,14 +1028,185 @@ fun ActiveMatchScreen(
                 Text(text = "Match ID: ${match.id}", style = MaterialTheme.typography.bodySmall)
                 Text(text = "Status: ${match.status}", style = MaterialTheme.typography.bodyMedium)
                 Text(text = "Challenges per Player: ${match.challengeCountPerPlayer}", style = MaterialTheme.typography.bodyMedium)
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Button(onClick = onViewChallengesClick, modifier = Modifier.fillMaxWidth()) {
+                    Text("View My Challenges")
+                }
             } else {
                 Text(text = "Loading match data...", style = MaterialTheme.typography.bodyMedium)
             }
             
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
-            Button(onClick = onBackClick, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onBackClick, modifier = Modifier.fillMaxWidth()) {
                 Text("Back to Group")
+            }
+        }
+    }
+}
+
+@Composable
+fun MyChallengesScreen(
+    matchState: com.example.sidequest.ui.match.MatchState,
+    onBackClick: () -> Unit,
+    onChallengeClick: (String) -> Unit
+) {
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onBackClick) {
+                    Text("Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "My Challenges", style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+    ) { innerPadding ->
+        if (matchState.userChallenges.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+                Text("No challenges assigned yet.")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(matchState.userChallenges) { item ->
+                    ChallengeCard(
+                        challenge = item,
+                        onClick = { onChallengeClick(item.assignment.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChallengeCard(
+    challenge: ChallengeWithAssignment,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = challenge.template.category.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Text(
+                    text = "${challenge.template.points} pts",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = challenge.template.title,
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Status: ${challenge.assignment.status.name}",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (challenge.assignment.status == com.example.sidequest.data.ChallengeStatus.COMPLETED) Color.Green else Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+fun ChallengeDetailsScreen(
+    matchState: com.example.sidequest.ui.match.MatchState,
+    onBackClick: () -> Unit,
+    onSubmitProofClick: () -> Unit
+) {
+    val challenge = matchState.selectedChallenge
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onBackClick) {
+                    Text("Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Challenge Details", style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+    ) { innerPadding ->
+        if (challenge == null) {
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = challenge.template.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = challenge.template.difficulty.name,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "${challenge.template.points} Points",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Description",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = challenge.template.description,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                Button(
+                    onClick = onSubmitProofClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Mark as Completed")
+                }
             }
         }
     }

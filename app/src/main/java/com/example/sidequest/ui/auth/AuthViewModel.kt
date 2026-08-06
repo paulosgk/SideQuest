@@ -3,13 +3,20 @@ package com.example.sidequest.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sidequest.data.AuthRepository
+import com.example.sidequest.data.Challenge
+import com.example.sidequest.data.ChallengeRepository
 import com.example.sidequest.data.GroupRepository
 import com.example.sidequest.data.UserMetadata
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.FirebaseUser
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class AuthState(
@@ -19,29 +26,33 @@ data class AuthState(
     val isCreatingGroup: Boolean = false,
     val isLeavingGroup: Boolean = false,
     val isJoiningGroup: Boolean = false,
+    val isSeeding: Boolean = false,
     val groupCreatedId: String? = null,
     val error: String? = null
 )
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
-    private val groupRepository: GroupRepository
+    private val groupRepository: GroupRepository,
+    private val challengeRepository: ChallengeRepository
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow(AuthState(user = authRepository.currentUser))
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
+    private var metadataJob: Job? = null
+
     init {
-        authRepository.currentUser?.uid?.let { fetchUserMetadata(it) }
+        authRepository.currentUser?.uid?.let { startListeningToMetadata(it) }
     }
 
-    private fun fetchUserMetadata(uid: String) {
-        viewModelScope.launch {
-            val result = authRepository.getUserMetadata(uid)
-            _authState.value = _authState.value.copy(
-                userMetadata = result.getOrNull()
-            )
-        }
+    private fun startListeningToMetadata(uid: String) {
+        metadataJob?.cancel()
+        metadataJob = authRepository.getUserMetadataFlow(uid)
+            .onEach { metadata ->
+                _authState.value = _authState.value.copy(userMetadata = metadata)
+            }
+            .launchIn(viewModelScope)
     }
 
     fun login(email: String, password: String) {
@@ -51,12 +62,10 @@ class AuthViewModel(
             val user = result.getOrNull()
             
             if (user != null) {
-                val metadataResult = authRepository.getUserMetadata(user.uid)
+                startListeningToMetadata(user.uid)
                 _authState.value = _authState.value.copy(
                     isLoading = false,
-                    user = user,
-                    userMetadata = metadataResult.getOrNull(),
-                    error = metadataResult.exceptionOrNull()?.message
+                    user = user
                 )
             } else {
                 _authState.value = _authState.value.copy(
@@ -74,12 +83,10 @@ class AuthViewModel(
             val user = result.getOrNull()
 
             if (user != null) {
-                val metadataResult = authRepository.getUserMetadata(user.uid)
+                startListeningToMetadata(user.uid)
                 _authState.value = _authState.value.copy(
                     isLoading = false,
-                    user = user,
-                    userMetadata = metadataResult.getOrNull(),
-                    error = metadataResult.exceptionOrNull()?.message
+                    user = user
                 )
             } else {
                 _authState.value = _authState.value.copy(
@@ -97,12 +104,10 @@ class AuthViewModel(
             val user = result.getOrNull()
 
             if (user != null) {
-                val metadataResult = authRepository.getUserMetadata(user.uid)
+                startListeningToMetadata(user.uid)
                 _authState.value = _authState.value.copy(
                     isLoading = false,
-                    user = user,
-                    userMetadata = metadataResult.getOrNull(),
-                    error = metadataResult.exceptionOrNull()?.message
+                    user = user
                 )
             } else {
                 _authState.value = _authState.value.copy(
@@ -120,8 +125,6 @@ class AuthViewModel(
             val result = groupRepository.createGroup(uid)
             if (result.isSuccess) {
                 val groupId = result.getOrNull()
-                // Refresh metadata to reflect new groupId
-                fetchUserMetadata(uid)
                 _authState.value = _authState.value.copy(
                     isCreatingGroup = false,
                     groupCreatedId = groupId
@@ -142,7 +145,6 @@ class AuthViewModel(
             val result = groupRepository.joinGroup(uid, inviteCode)
             if (result.isSuccess) {
                 val groupId = result.getOrNull()
-                fetchUserMetadata(uid)
                 _authState.value = _authState.value.copy(
                     isJoiningGroup = false,
                     groupCreatedId = groupId
@@ -162,7 +164,6 @@ class AuthViewModel(
             _authState.value = _authState.value.copy(isLeavingGroup = true, error = null)
             val result = groupRepository.leaveGroup(uid, groupId)
             if (result.isSuccess) {
-                fetchUserMetadata(uid)
                 _authState.value = _authState.value.copy(isLeavingGroup = false)
             } else {
                 _authState.value = _authState.value.copy(
@@ -173,11 +174,36 @@ class AuthViewModel(
         }
     }
 
+    fun seedDefaultChallenges(jsonString: String) {
+        viewModelScope.launch {
+            _authState.value = _authState.value.copy(isSeeding = true, error = null)
+            try {
+                val listType = object : TypeToken<List<Challenge>>() {}.type
+                val challenges: List<Challenge> = Gson().fromJson(jsonString, listType)
+                val result = challengeRepository.seedChallenges(challenges)
+                if (result.isSuccess) {
+                    _authState.value = _authState.value.copy(isSeeding = false)
+                } else {
+                    _authState.value = _authState.value.copy(
+                        isSeeding = false,
+                        error = result.exceptionOrNull()?.message
+                    )
+                }
+            } catch (e: Exception) {
+                _authState.value = _authState.value.copy(
+                    isSeeding = false,
+                    error = "Failed to parse challenges: ${e.message}"
+                )
+            }
+        }
+    }
+
     fun resetGroupCreationState() {
         _authState.value = _authState.value.copy(groupCreatedId = null)
     }
 
     fun logout() {
+        metadataJob?.cancel()
         authRepository.logout()
         _authState.value = AuthState()
     }
