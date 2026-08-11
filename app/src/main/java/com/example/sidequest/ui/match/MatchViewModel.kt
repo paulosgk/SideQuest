@@ -26,7 +26,8 @@ data class MatchState(
     val isLoading: Boolean = false,
     val isCreating: Boolean = false,
     val error: String? = null,
-    val matchCreatedId: String? = null
+    val matchCreatedId: String? = null,
+    val challengeSubmitted: Boolean = false
 )
 
 class MatchViewModel(
@@ -105,7 +106,10 @@ class MatchViewModel(
             val result = matchRepository.updateChallengeStatus(assignmentId, status)
             if (result.isSuccess) {
                 // The flow from repository will update the UI automatically
-                _state.value = _state.value.copy(isLoading = false)
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    challengeSubmitted = status == ChallengeStatus.SUBMITTED
+                )
             } else {
                 _state.value = _state.value.copy(
                     isLoading = false,
@@ -113,6 +117,10 @@ class MatchViewModel(
                 )
             }
         }
+    }
+
+    fun resetChallengeSubmissionState() {
+        _state.value = _state.value.copy(challengeSubmitted = false)
     }
 
     fun resetMatchCreationState() {

@@ -69,6 +69,7 @@ import com.example.sidequest.ui.auth.AuthViewModel
 import com.example.sidequest.ui.group.GroupViewModel
 import com.example.sidequest.ui.match.ActiveMatchScreen
 import com.example.sidequest.ui.match.ChallengeDetailsScreen
+import com.example.sidequest.ui.match.CompletionConfirmationScreen
 import com.example.sidequest.ui.match.CreateMatchScreen
 import com.example.sidequest.ui.match.MatchViewModel
 import com.example.sidequest.ui.match.MyChallengesScreen
@@ -98,6 +99,9 @@ sealed class Screen(val route: String) {
     object ChallengeDetails : Screen("challenge_details/{groupId}/{matchId}/{assignmentId}") {
         fun createRoute(groupId: String, matchId: String, assignmentId: String) = 
             "challenge_details/$groupId/$matchId/$assignmentId"
+    }
+    object CompletionConfirmation : Screen("completion_confirmation/{points}") {
+        fun createRoute(points: Int) = "completion_confirmation/$points"
     }
 }
 
@@ -370,11 +374,30 @@ fun SideQuestNavHost(
                 matchViewModel.selectChallenge(assignmentId)
             }
 
+            // Handle challenge submission navigation
+            LaunchedEffect(matchState.challengeSubmitted) {
+                if (matchState.challengeSubmitted) {
+                    val points = matchState.selectedChallenge?.template?.points ?: 0
+                    navController.navigate(Screen.CompletionConfirmation.createRoute(points))
+                    matchViewModel.resetChallengeSubmissionState()
+                }
+            }
+
             ChallengeDetailsScreen(
                 matchState = matchState,
                 onBackClick = { navController.popBackStack() },
                 onCompleteClick = { assignmentId ->
-                    matchViewModel.updateChallengeStatus(assignmentId, ChallengeStatus.COMPLETED)
+                    matchViewModel.updateChallengeStatus(assignmentId, ChallengeStatus.SUBMITTED)
+                }
+            )
+        }
+        composable(Screen.CompletionConfirmation.route) { backStackEntry ->
+            val points = backStackEntry.arguments?.getString("points")?.toIntOrNull() ?: 0
+            
+            CompletionConfirmationScreen(
+                points = points,
+                onContinueClick = {
+                    navController.popBackStack(Screen.MyChallenges.route, inclusive = false)
                 }
             )
         }

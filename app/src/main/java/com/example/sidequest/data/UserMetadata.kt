@@ -8,6 +8,7 @@ data class UserMetadata(
     val email: String = "",
     val profilePhotoUrl: String = "",
     val groupId: String? = null,
+    val totalPoints: Int = 0,
     val premium: Boolean = false,
     val createdAt: Timestamp? = null
 )
