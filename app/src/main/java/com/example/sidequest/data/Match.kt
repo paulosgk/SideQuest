@@ -13,6 +13,6 @@ data class Match(
     val startDate: Timestamp? = null,
     val endDate: Timestamp? = null,
     val status: MatchStatus = MatchStatus.ACTIVE,
-    val challengeCountPerPlayer: Int = 3,
+    val challengeCountPerPlayer: Int = 5,
     val createdAt: Timestamp? = null
 )

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sidequest.data.Challenge
 import com.example.sidequest.data.ChallengeRepository
+import com.example.sidequest.data.ChallengeStatus
 import com.example.sidequest.data.ChallengeWithAssignment
 import com.example.sidequest.data.Match
 import com.example.sidequest.data.MatchRepository
@@ -96,6 +97,22 @@ class MatchViewModel(
     fun selectChallenge(assignmentId: String) {
         val challenge = _state.value.userChallenges.find { it.assignment.id == assignmentId }
         _state.value = _state.value.copy(selectedChallenge = challenge)
+    }
+
+    fun updateChallengeStatus(assignmentId: String, status: ChallengeStatus) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, error = null)
+            val result = matchRepository.updateChallengeStatus(assignmentId, status)
+            if (result.isSuccess) {
+                // The flow from repository will update the UI automatically
+                _state.value = _state.value.copy(isLoading = false)
+            } else {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    error = result.exceptionOrNull()?.message
+                )
+            }
+        }
     }
 
     fun resetMatchCreationState() {

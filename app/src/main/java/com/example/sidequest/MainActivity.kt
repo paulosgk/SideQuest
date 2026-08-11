@@ -60,13 +60,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.sidequest.data.ChallengeWithAssignment
+import com.example.sidequest.data.ChallengeStatus
 import com.example.sidequest.data.FirebaseAuthRepository
 import com.example.sidequest.data.FirebaseChallengeRepository
 import com.example.sidequest.data.FirebaseGroupRepository
 import com.example.sidequest.data.FirebaseMatchRepository
 import com.example.sidequest.ui.auth.AuthViewModel
 import com.example.sidequest.ui.group.GroupViewModel
+import com.example.sidequest.ui.match.ActiveMatchScreen
+import com.example.sidequest.ui.match.ChallengeDetailsScreen
+import com.example.sidequest.ui.match.CreateMatchScreen
 import com.example.sidequest.ui.match.MatchViewModel
+import com.example.sidequest.ui.match.MyChallengesScreen
 import com.example.sidequest.ui.theme.SideQuestTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -368,7 +373,9 @@ fun SideQuestNavHost(
             ChallengeDetailsScreen(
                 matchState = matchState,
                 onBackClick = { navController.popBackStack() },
-                onSubmitProofClick = { /* TODO */ }
+                onCompleteClick = { assignmentId ->
+                    matchViewModel.updateChallengeStatus(assignmentId, ChallengeStatus.COMPLETED)
+                }
             )
         }
     }
@@ -931,283 +938,6 @@ fun GroupDetailScreen(
 
         if (authState.isLeavingGroup) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        }
-    }
-}
-
-@Composable
-fun CreateMatchScreen(
-    groupId: String,
-    matchState: com.example.sidequest.ui.match.MatchState,
-    onBackClick: () -> Unit,
-    onCreateMatchClick: (Int) -> Unit,
-    onMatchCreated: (String) -> Unit
-) {
-    var challengeCount by remember { mutableStateOf("3") }
-    val context = LocalContext.current
-
-    LaunchedEffect(matchState.matchCreatedId) {
-        matchState.matchCreatedId?.let { onMatchCreated(it) }
-    }
-
-    LaunchedEffect(matchState.error) {
-        matchState.error?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(text = "New Match Configuration", style = MaterialTheme.typography.headlineLarge)
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            OutlinedTextField(
-                value = challengeCount,
-                onValueChange = { if (it.all { char -> char.isDigit() }) challengeCount = it },
-                label = { Text("Challenges per Player") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                enabled = !matchState.isCreating
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Button(
-                onClick = { onCreateMatchClick(challengeCount.toIntOrNull() ?: 3) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !matchState.isCreating && challengeCount.isNotBlank()
-            ) {
-                Text("Launch Match")
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            OutlinedButton(
-                onClick = onBackClick,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !matchState.isCreating
-            ) {
-                Text("Cancel")
-            }
-        }
-
-        if (matchState.isCreating) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        }
-    }
-}
-
-@Composable
-fun ActiveMatchScreen(
-    matchId: String,
-    matchState: com.example.sidequest.ui.match.MatchState,
-    onBackClick: () -> Unit,
-    onViewChallengesClick: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(text = "Active Match", style = MaterialTheme.typography.headlineLarge)
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            val match = matchState.activeMatch
-            if (match != null) {
-                Text(text = "Match ID: ${match.id}", style = MaterialTheme.typography.bodySmall)
-                Text(text = "Status: ${match.status}", style = MaterialTheme.typography.bodyMedium)
-                Text(text = "Challenges per Player: ${match.challengeCountPerPlayer}", style = MaterialTheme.typography.bodyMedium)
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                Button(onClick = onViewChallengesClick, modifier = Modifier.fillMaxWidth()) {
-                    Text("View My Challenges")
-                }
-            } else {
-                Text(text = "Loading match data...", style = MaterialTheme.typography.bodyMedium)
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            OutlinedButton(onClick = onBackClick, modifier = Modifier.fillMaxWidth()) {
-                Text("Back to Group")
-            }
-        }
-    }
-}
-
-@Composable
-fun MyChallengesScreen(
-    matchState: com.example.sidequest.ui.match.MatchState,
-    onBackClick: () -> Unit,
-    onChallengeClick: (String) -> Unit
-) {
-    Scaffold(
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onBackClick) {
-                    Text("Back")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "My Challenges", style = MaterialTheme.typography.headlineMedium)
-            }
-        }
-    ) { innerPadding ->
-        if (matchState.userChallenges.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                Text("No challenges assigned yet.")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(matchState.userChallenges) { item ->
-                    ChallengeCard(
-                        challenge = item,
-                        onClick = { onChallengeClick(item.assignment.id) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ChallengeCard(
-    challenge: ChallengeWithAssignment,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = challenge.template.category.name,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Text(
-                    text = "${challenge.template.points} pts",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = challenge.template.title,
-                style = MaterialTheme.typography.titleLarge
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Status: ${challenge.assignment.status.name}",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (challenge.assignment.status == com.example.sidequest.data.ChallengeStatus.COMPLETED) Color.Green else Color.Gray
-            )
-        }
-    }
-}
-
-@Composable
-fun ChallengeDetailsScreen(
-    matchState: com.example.sidequest.ui.match.MatchState,
-    onBackClick: () -> Unit,
-    onSubmitProofClick: () -> Unit
-) {
-    val challenge = matchState.selectedChallenge
-
-    Scaffold(
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onBackClick) {
-                    Text("Back")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Challenge Details", style = MaterialTheme.typography.headlineMedium)
-            }
-        }
-    ) { innerPadding ->
-        if (challenge == null) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = challenge.template.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = challenge.template.difficulty.name,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = "${challenge.template.points} Points",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "Description",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = challenge.template.description,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                Button(
-                    onClick = onSubmitProofClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Mark as Completed")
-                }
-            }
         }
     }
 }

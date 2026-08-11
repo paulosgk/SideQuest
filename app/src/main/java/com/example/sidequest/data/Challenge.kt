@@ -24,6 +24,10 @@ enum class ChallengeType {
     CUSTOM
 }
 
+/**
+ * Represents a reusable challenge template.
+ * The [points] are automatically determined by the [difficulty] level.
+ */
 data class Challenge(
     val id: String = "",
     val title: String = "",

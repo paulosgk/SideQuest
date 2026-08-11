@@ -16,6 +16,7 @@ interface MatchRepository {
     
     fun getActiveMatchFlow(groupId: String): Flow<Match?>
     fun getAssignedChallengesFlow(matchId: String, playerId: String): Flow<List<AssignedChallenge>>
+    suspend fun updateChallengeStatus(assignmentId: String, status: ChallengeStatus): Result<Unit>
 }
 
 class FirebaseMatchRepository(
@@ -128,5 +129,17 @@ class FirebaseMatchRepository(
             }
         
         awaitClose { subscription.remove() }
+    }
+
+    override suspend fun updateChallengeStatus(assignmentId: String, status: ChallengeStatus): Result<Unit> {
+        return try {
+            firestore.collection("assignedChallenges")
+                .document(assignmentId)
+                .update("status", status.name)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }
